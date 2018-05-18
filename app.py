@@ -1,7 +1,7 @@
 import logging
 import os
 
-from flask import Flask, redirect, session
+from flask import Flask, redirect, request, session
 
 import pocket
 
@@ -18,18 +18,19 @@ LOG = logging.getLogger(__name__)
 def index():
     request_token = session.get('REQUEST_TOKEN')
     access_token = session.get('ACCESS_TOKEN')
+    unread = request.args.get('unread')
 
     if not request_token:
         request_token, authorized_url = pocket.get_authorized_url(
-            f'{ROOT_URL}/auth')
+            f'{ROOT_URL}/auth?unread={unread}')
         session['REQUEST_TOKEN'] = request_token
         return redirect(authorized_url)
 
     if request_token:
         if access_token:
-            return get_random_favorite(access_token)
+            return get_random_pick(access_token, unread)
         else:
-            return redirect(f'{ROOT_URL}/auth')
+            return redirect(f'{ROOT_URL}/auth?unread={unread}')
 
     return ''
 
@@ -49,11 +50,17 @@ def auth():
             return redirect(ROOT_URL)
         session['ACCESS_TOKEN'] = access_token
 
-    return get_random_favorite(access_token)
+    return get_random_pick(access_token, request.args.get('unread'))
 
 
-def get_random_favorite(access_token: str):
-    url = pocket.get_random_favorite(access_token)
+def get_random_pick(access_token: str, unread=None):
+    state = 'all'
+    favorite = True
+    if unread:
+        state = 'unread'
+        favorite = False
+
+    url = pocket.random_pick(access_token, state, favorite)
     if url:
         return redirect(url)
     else:

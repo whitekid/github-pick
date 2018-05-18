@@ -65,9 +65,10 @@ def get(access_token: str,
     return resp.json()
 
 
-def get_random_favorite(access_token: str):
+def random_pick(access_token: str, state=None, favorite=None):
     try:
-        items = get(access_token, state='all', favorite=True)['list']
+        print(state, favorite)
+        items = get(access_token, state=state, favorite=favorite)['list']
     except requests.exceptions.HTTPError as err:
         if err.status_code == 400:
             return None
