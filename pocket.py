@@ -10,13 +10,12 @@ LOG = logging.getLogger(__name__)
 
 def get_authorized_url(redirect_uri: str):
     # get request token
-    resp = requests.post(
-        'https://getpocket.com/v3/oauth/request',
-        headers={'X-Accept': 'application/json'},
-        json={
-            'consumer_key': CONSUMER_KEY,
-            'redirect_uri': redirect_uri,
-        })
+    resp = requests.post('https://getpocket.com/v3/oauth/request',
+                         headers={'X-Accept': 'application/json'},
+                         json={
+                             'consumer_key': CONSUMER_KEY,
+                             'redirect_uri': redirect_uri,
+                         })
     resp.raise_for_status()
 
     request_token = resp.json()['code']
@@ -26,13 +25,12 @@ def get_authorized_url(redirect_uri: str):
 
 
 def get_access_token(request_token: str):
-    resp = requests.post(
-        'https://getpocket.com/v3/oauth/authorize',
-        headers={'X-Accept': 'application/json'},
-        json={
-            'consumer_key': CONSUMER_KEY,
-            'code': request_token,
-        })
+    resp = requests.post('https://getpocket.com/v3/oauth/authorize',
+                         headers={'X-Accept': 'application/json'},
+                         json={
+                             'consumer_key': CONSUMER_KEY,
+                             'code': request_token,
+                         })
 
     if resp.status_code in (400, 403):
         return None, None
@@ -56,10 +54,9 @@ def get(access_token: str,
     if favorite is not None:
         param['favorite'] = 1 if favorite else 0
 
-    resp = requests.post(
-        'https://getpocket.com/v3/get',
-        headers={'X-Accept': 'application/json'},
-        json=param)
+    resp = requests.post('https://getpocket.com/v3/get',
+                         headers={'X-Accept': 'application/json'},
+                         json=param)
     resp.raise_for_status()
 
     return resp.json()
