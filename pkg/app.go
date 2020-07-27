@@ -56,6 +56,7 @@ func (s *Service) setupRoute() *echo.Echo {
 
 	e.GET("/", s.getIndex)
 	e.GET("/auth", s.getAuth)
+	e.GET("/article/:item_id", s.getArticle) // TODO 원래는 DELETE로 해야하는데, 귀찮아서..
 	e.GET("/sessions", s.getSession)
 
 	return e
@@ -115,10 +116,11 @@ func (s *Service) getIndex(c echo.Context) error {
 		return c.Redirect(http.StatusFound, s.rootURL)
 	}
 
-	log.Infof("accessToken acquired, get random favorite pick")
 	accessToken := sess.Values[keyAccessToken].(string)
+	log.Infof("accessToken acquired, get random favorite pick: %s", accessToken)
 	url, err := getRandomPickURL(accessToken)
 	if err != nil {
+		log.Errorf("error: %s", err)
 		return err
 	}
 
@@ -153,4 +155,38 @@ func (s *Service) getAuth(c echo.Context) (err error) {
 
 	log.Infof("redirect to root to read a item")
 	return c.Redirect(http.StatusFound, s.rootURL)
+}
+
+func (s *Service) requireAccessToken(c echo.Context, token *string) error {
+	sess := s.session(c)
+
+	if _, exists := sess.Values[keyAccessToken]; !exists {
+		delete(sess.Values, keyRequestToken)
+		sess.Save(c.Request(), c.Response())
+		return fmt.Errorf("access token not found")
+	}
+
+	*token = sess.Values[keyAccessToken].(string)
+	return nil
+}
+
+// remove given article
+func (s *Service) getArticle(c echo.Context) error {
+	itemID := c.Param("item_id")
+	if itemID == "" {
+		return c.String(http.StatusBadRequest, "ItemID missed")
+	}
+
+	var accessToken string
+
+	if err := s.requireAccessToken(c, &accessToken); err != nil {
+		return c.Redirect(http.StatusFound, s.rootURL)
+	}
+
+	if err := deleteArticle(accessToken, itemID); err != nil {
+		log.Errorf("failed: %s", err)
+		return err
+	}
+
+	return nil
 }

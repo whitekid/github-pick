@@ -1,6 +1,8 @@
 package pocket
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -71,6 +73,7 @@ func getRandomPickURL(accessToken string) (string, error) {
 			"access_token": accessToken,
 			"state":        "all",
 			"favorite":     1,
+			"detailType":   "simple",
 		},
 	).Do()
 	if err != nil {
@@ -84,7 +87,10 @@ func getRandomPickURL(accessToken string) (string, error) {
 	var response struct {
 		Status int `json:"status"`
 		List   map[string]struct {
-			ItemID string `json:"item_id"`
+			ItemID      string `json:"item_id"`
+			GivelURL    string `json:"given_url"`
+			ResolvedURL string `json:"resolved_url"`
+			IsArticle   string `json:"is_article"`
 		} `json:"list"`
 	}
 	if err := resp.JSON(&response); err != nil {
@@ -92,8 +98,39 @@ func getRandomPickURL(accessToken string) (string, error) {
 	}
 
 	for _, v := range response.List {
-		log.Infof("get pick: %s", v.ItemID)
-		return fmt.Sprintf("https://app.getpocket.com/read/%s", v.ItemID), nil
+		log.Infof("article: %+v", v)
+		if v.IsArticle == "1" {
+			return fmt.Sprintf("https://app.getpocket.com/read/%s", v.ItemID), nil
+		}
+		return v.ResolvedURL, nil
 	}
 	return "", nil
+}
+
+func deleteArticle(accessToken, itemID string) error {
+	type action struct {
+		Action string  `json:"action"`
+		ItemID string  `json:"item_id"`
+		Time   *string `json:"time"`
+	}
+
+	actions := []action{{Action: "delete", ItemID: itemID}}
+	var buf bytes.Buffer
+	json.NewEncoder(&buf).Encode(&actions)
+
+	log.Infof("remove item: %s", itemID)
+	resp, err := request.Post("https://getpocket.com/v3/send").
+		Form("consumer_key", os.Getenv("CONSUMER_KEY")).
+		Form("access_token", accessToken).
+		Form("actions", buf.String()).
+		Do()
+	if err != nil {
+		return err
+	}
+
+	if !resp.Success() {
+		return fmt.Errorf("failed with status %d", resp.StatusCode)
+	}
+
+	return nil
 }
