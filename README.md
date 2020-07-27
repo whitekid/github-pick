@@ -3,10 +3,10 @@
 launch server
 
     export CONSUMER_KEY={your-get-pocket-consumer-key}
-    export SECRET_KEY={random}
     export ROOT_URL={your-root-url}
 
-    gunicorn app:app --bind 127.0.0.1:8000 --workers 4 --access-logfile -
+    make
+    bin/pocket-pick
 
 and open ROOT_URL with your browser.
 
