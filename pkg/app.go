@@ -96,11 +96,10 @@ func (s *Service) getSession(c echo.Context) error {
 
 func (s *Service) getIndex(c echo.Context) error {
 	sess := s.session(c)
-	unread := c.QueryParams().Get("unread")
 
 	// if not token, try to authorize
 	if _, exists := sess.Values[keyRequestToken]; !exists {
-		requestToken, authorizedURL, err := getAuthorizedURL(fmt.Sprintf("%s/auth?unread=%s", s.rootURL, unread))
+		requestToken, authorizedURL, err := getAuthorizedURL(s.rootURL)
 		if err != nil {
 			return err
 		}
