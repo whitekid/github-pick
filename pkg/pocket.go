@@ -11,20 +11,31 @@ import (
 	"github.com/whitekid/go-utils/request"
 )
 
-// NewGetPocketAPI create GetPocket API
-func NewGetPocketAPI(consumerKey, accessToken string) *GetPocketAPI {
-	return &GetPocketAPI{
-		consumerKey: consumerKey,
-		accessToken: accessToken,
-	}
-}
-
 // GetPocketAPI get pocket api
+// please refer https://getpocket.com/developer/docs/overview
 type GetPocketAPI struct {
 	consumerKey string
 	accessToken string
+	sess        request.Interface // common sessions
+
+	// API interfaces
+	Articles *ArticlesAPI
 }
 
+// NewGetPocketAPI create GetPocket API
+func NewGetPocketAPI(consumerKey, accessToken string) *GetPocketAPI {
+	api := &GetPocketAPI{
+		consumerKey: consumerKey,
+		accessToken: accessToken,
+		sess:        request.NewSession(nil),
+	}
+
+	api.Articles = &ArticlesAPI{pocket: api}
+
+	return api
+}
+
+// Article pocket article, simplified version, it's not full structure
 type Article struct {
 	ItemID      string `json:"item_id"`
 	GivelURL    string `json:"given_url"`
@@ -34,7 +45,7 @@ type Article struct {
 
 // AuthorizedURL get authorizedURL
 func (g *GetPocketAPI) AuthorizedURL(redirectURL string) (string, string, error) {
-	resp, err := request.Post("https://getpocket.com/v3/oauth/request").Header("X-Accept", "application/json").JSON(
+	resp, err := g.sess.Post("https://getpocket.com/v3/oauth/request").Header("X-Accept", "application/json").JSON(
 		map[string]string{
 			"consumer_key": g.consumerKey,
 			"redirect_uri": redirectURL,
@@ -64,7 +75,7 @@ func (g *GetPocketAPI) AuthorizedURL(redirectURL string) (string, string, error)
 func (g *GetPocketAPI) AccessToken(requestToken string) (string, string, error) {
 	log.Infof("getAccessToken with %s", requestToken)
 
-	resp, err := request.Post("https://getpocket.com/v3/oauth/authorize").Header("X-Accept", "application/json").
+	resp, err := g.sess.Post("https://getpocket.com/v3/oauth/authorize").Header("X-Accept", "application/json").
 		JSON(map[string]string{
 			"consumer_key": g.consumerKey,
 			"code":         requestToken,
@@ -88,11 +99,16 @@ func (g *GetPocketAPI) AccessToken(requestToken string) (string, string, error) 
 	return response.AccessToken, response.Username, nil
 }
 
-func (g *GetPocketAPI) Get() (map[string]Article, error) {
-	resp, err := request.Post("https://getpocket.com/v3/get").Header("X-Accept", "application/json").JSON(
+type ArticlesAPI struct {
+	pocket *GetPocketAPI
+}
+
+// Get Retrieving a User's Pocket Data
+func (a *ArticlesAPI) Get() (map[string]Article, error) {
+	resp, err := a.pocket.sess.Post("https://getpocket.com/v3/get").Header("X-Accept", "application/json").JSON(
 		map[string]interface{}{
-			"consumer_key": g.consumerKey,
-			"access_token": g.accessToken,
+			"consumer_key": a.pocket.consumerKey,
+			"access_token": a.pocket.accessToken,
 			"state":        "all",
 			"favorite":     1,
 			"detailType":   "simple",
@@ -118,7 +134,7 @@ func (g *GetPocketAPI) Get() (map[string]Article, error) {
 }
 
 // Delete delete article
-func (g *GetPocketAPI) Delete(itemID string) error {
+func (a *ArticlesAPI) Delete(itemID string) error {
 	type action struct {
 		Action string  `json:"action"`
 		ItemID string  `json:"item_id"`
@@ -130,9 +146,9 @@ func (g *GetPocketAPI) Delete(itemID string) error {
 	json.NewEncoder(&buf).Encode(&actions)
 
 	log.Infof("remove item: %s", itemID)
-	resp, err := request.Post("https://getpocket.com/v3/send").
-		Form("consumer_key", g.consumerKey).
-		Form("access_token", g.accessToken).
+	resp, err := a.pocket.sess.Post("https://getpocket.com/v3/send").
+		Form("consumer_key", a.pocket.consumerKey).
+		Form("access_token", a.pocket.accessToken).
 		Form("actions", buf.String()).
 		Do()
 	if err != nil {
@@ -148,7 +164,7 @@ func (g *GetPocketAPI) Delete(itemID string) error {
 
 func getRandomPickURL(accessToken string) (string, error) {
 	api := NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), accessToken)
-	list, err := api.Get()
+	list, err := api.Articles.Get()
 	if err != nil {
 		return "", err
 	}

@@ -173,7 +173,7 @@ func (s *Service) getArticle(c echo.Context) error {
 		return c.Redirect(http.StatusFound, s.rootURL)
 	}
 
-	if err := NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), accessToken).Delete(itemID); err != nil {
+	if err := NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), accessToken).Articles.Delete(itemID); err != nil {
 		log.Errorf("failed: %s", err)
 		return err
 	}
