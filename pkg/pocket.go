@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 
 	log "github.com/whitekid/go-utils/logging"
@@ -97,14 +98,25 @@ func getRandomPickURL(accessToken string) (string, error) {
 		return "", err
 	}
 
-	for _, v := range response.List {
-		log.Infof("article: %+v", v)
-		if v.IsArticle == "1" {
-			return fmt.Sprintf("https://app.getpocket.com/read/%s", v.ItemID), nil
+	log.Infof("you have %d articles", len(response.List))
+	pick := rand.Intn(len(response.List))
+
+	selected := ""
+	i := 0
+	for k := range response.List {
+		if i == pick-1 {
+			selected = k
+			break
 		}
-		return v.ResolvedURL, nil
+		i++
 	}
-	return "", nil
+
+	v := response.List[selected]
+	log.Infof("article: %+v", v)
+	if v.IsArticle == "1" {
+		return fmt.Sprintf("https://app.getpocket.com/read/%s", v.ItemID), nil
+	}
+	return v.ResolvedURL, nil
 }
 
 func deleteArticle(accessToken, itemID string) error {

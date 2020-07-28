@@ -99,10 +99,11 @@ func (s *Service) getIndex(c echo.Context) error {
 
 	// if not token, try to authorize
 	if _, exists := sess.Values[keyRequestToken]; !exists {
-		requestToken, authorizedURL, err := getAuthorizedURL(s.rootURL)
+		requestToken, authorizedURL, err := getAuthorizedURL(fmt.Sprintf("%s/auth", s.rootURL))
 		if err != nil {
 			return err
 		}
+
 		sess.Values[keyRequestToken] = requestToken
 		c.Logger().Infof("save requestToken to session: %s", requestToken)
 		sess.Save(c.Request(), c.Response())
