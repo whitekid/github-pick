@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/spf13/viper"
 	log "github.com/whitekid/go-utils/logging"
 )
 
@@ -29,22 +30,11 @@ type Service struct {
 	rootURL string
 }
 
-func getEnvDef(key, def string) string {
-	value, exists := os.LookupEnv(key)
-	if !exists {
-		return def
-	}
-
-	return value
-}
-
 // Serve serve the main service
 func (s *Service) Serve(ctx context.Context, args ...string) error {
 	e := s.setupRoute()
 
-	s.rootURL = getEnvDef("ROOT_URL", "http://127.0.0.1:8000")
-
-	return e.Start(":8000")
+	return e.Start(viper.GetString(KeyBind))
 }
 
 func (s *Service) setupRoute() *echo.Echo {
@@ -99,7 +89,7 @@ func (s *Service) getIndex(c echo.Context) error {
 
 	// if not token, try to authorize
 	if _, exists := sess.Values[keyRequestToken]; !exists {
-		requestToken, authorizedURL, err := getAuthorizedURL(fmt.Sprintf("%s/auth", s.rootURL))
+		requestToken, authorizedURL, err := NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), "").AuthorizedURL(fmt.Sprintf("%s/auth", s.rootURL))
 		if err != nil {
 			return err
 		}
@@ -137,7 +127,7 @@ func (s *Service) getAuth(c echo.Context) (err error) {
 
 	requestToken := sess.Values[keyRequestToken].(string)
 	if _, exists := sess.Values[keyAccessToken]; !exists {
-		accessToken, _, err := getAccessToken(requestToken)
+		accessToken, _, err := NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), "").AccessToken(requestToken)
 		if err != nil {
 			log.Errorf("fail to get access token: %s", err)
 			return err
@@ -183,7 +173,7 @@ func (s *Service) getArticle(c echo.Context) error {
 		return c.Redirect(http.StatusFound, s.rootURL)
 	}
 
-	if err := deleteArticle(accessToken, itemID); err != nil {
+	if err := NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), accessToken).Delete(itemID); err != nil {
 		log.Errorf("failed: %s", err)
 		return err
 	}
