@@ -5,9 +5,10 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"testing"
+	"time"
 
+	"github.com/allegro/bigcache"
 	"github.com/stretchr/testify/require"
-	_ "github.com/whitekid/go-utils"
 	"github.com/whitekid/go-utils/request"
 )
 
@@ -49,4 +50,10 @@ func TestIndex(t *testing.T) {
 
 func TestAuth(t *testing.T) {
 	panic("Not Implemented")
+}
+
+func TestCache(t *testing.T) {
+	cache, _ := bigcache.NewBigCache(bigcache.DefaultConfig(10 * time.Minute))
+	cache.Set("hello", []byte("world"))
+	cache.Get("hello")
 }

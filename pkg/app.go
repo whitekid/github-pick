@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
+	"github.com/allegro/bigcache"
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
@@ -22,12 +24,23 @@ const (
 
 // New implements service interface
 func New() *Service {
-	return &Service{}
+	rootURL := os.Getenv("ROOT_URL")
+	if rootURL == "" {
+		panic("ROOT_URL required")
+	}
+
+	cache, _ := bigcache.NewBigCache(bigcache.DefaultConfig(time.Hour))
+
+	return &Service{
+		cache:   cache,
+		rootURL: rootURL,
+	}
 }
 
 // Service the main service
 type Service struct {
 	rootURL string
+	cache   *bigcache.BigCache // for api cache
 }
 
 // Serve serve the main service
@@ -108,7 +121,7 @@ func (s *Service) getIndex(c echo.Context) error {
 
 	accessToken := sess.Values[keyAccessToken].(string)
 	log.Infof("accessToken acquired, get random favorite pick: %s", accessToken)
-	url, err := getRandomPickURL(accessToken)
+	url, err := getRandomPickURL(s.cache, accessToken)
 	if err != nil {
 		log.Errorf("error: %s", err)
 		return err
