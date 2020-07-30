@@ -22,7 +22,6 @@ func init() {
 
 	fs.StringP(pocket.KeyBind, "B", "127.0.0.1:8000", "bind address")
 	viper.BindPFlag(pocket.KeyBind, fs.Lookup(pocket.KeyBind))
-
 }
 
 func initConfig() {

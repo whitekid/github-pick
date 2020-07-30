@@ -39,9 +39,9 @@ func (s *Service) Serve(ctx context.Context, args ...string) error {
 
 func (s *Service) setupRoute() *echo.Echo {
 	e := echo.New()
-	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
-		Format: "method=${method}, uri=${uri}, status=${status}\n",
-	}))
+
+	loggerConfig := middleware.DefaultLoggerConfig
+	e.Use(middleware.LoggerWithConfig(loggerConfig))
 	e.Use(session.Middleware(sessions.NewCookieStore([]byte("secret"))))
 
 	e.GET("/", s.getIndex)

@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
+	"strconv"
 
+	"github.com/allegro/bigcache"
+	"github.com/pkg/errors"
 	log "github.com/whitekid/go-utils/logging"
 	"github.com/whitekid/go-utils/request"
 )
@@ -73,7 +77,7 @@ func (g *GetPocketAPI) AuthorizedURL(redirectURL string) (string, string, error)
 
 // AccessToken get accessToken, username from requestToken using oauth
 func (g *GetPocketAPI) AccessToken(requestToken string) (string, string, error) {
-	log.Infof("getAccessToken with %s", requestToken)
+	log.Debugf("getAccessToken with %s", requestToken)
 
 	resp, err := g.sess.Post("https://getpocket.com/v3/oauth/authorize").Header("X-Accept", "application/json").
 		JSON(map[string]string{
@@ -99,21 +103,52 @@ func (g *GetPocketAPI) AccessToken(requestToken string) (string, string, error) 
 	return response.AccessToken, response.Username, nil
 }
 
+// ArticlesAPI ...
 type ArticlesAPI struct {
 	pocket *GetPocketAPI
 }
 
+const (
+	UnFavorited = 1 // only return un-favorited items
+	Favorited   = 2 // only return favorited items
+)
+
+// GetOpts ...
+type GetOpts struct {
+	Search   string // Only return items whose title or url contain the search string
+	Domain   string // Only return items from a particular domain
+	Favorite int    // only return favorited items
+}
+
+// ArticleGetResponse ...
+type ArticleGetResponse struct {
+	Status int                 `json:"status"`
+	List   *map[string]Article `json:"list"`
+}
+
 // Get Retrieving a User's Pocket Data
-func (a *ArticlesAPI) Get() (map[string]Article, error) {
-	resp, err := a.pocket.sess.Post("https://getpocket.com/v3/get").Header("X-Accept", "application/json").JSON(
-		map[string]interface{}{
-			"consumer_key": a.pocket.consumerKey,
-			"access_token": a.pocket.accessToken,
-			"state":        "all",
-			"favorite":     1,
-			"detailType":   "simple",
-		},
-	).Do()
+func (a *ArticlesAPI) Get(opts GetOpts) (map[string]Article, error) {
+	params := map[string]interface{}{
+		"consumer_key": a.pocket.consumerKey,
+		"access_token": a.pocket.accessToken,
+		"state":        "all",
+		"detailType":   "simple",
+	}
+
+	if opts.Favorite != 0 {
+		params["favorite"] = strconv.FormatInt(int64(opts.Favorite-1), 10)
+	}
+
+	if opts.Search != "" {
+		params["search"] = opts.Search
+	}
+
+	if opts.Domain != "" {
+		params["domain"] = opts.Domain
+	}
+
+	resp, err := a.pocket.sess.Post("https://getpocket.com/v3/get").
+		Header("X-Accept", "application/json").JSON(params).Do()
 	if err != nil {
 		return nil, err
 	}
@@ -122,59 +157,131 @@ func (a *ArticlesAPI) Get() (map[string]Article, error) {
 		return nil, fmt.Errorf("failed with status %d", resp.StatusCode)
 	}
 
-	var response struct {
-		Status int                `json:"status"`
-		List   map[string]Article `json:"list"`
+	var buffer bytes.Buffer
+	var buf1 bytes.Buffer
+	io.Copy(&buffer, resp.Body)
+	defer resp.Body.Close()
+
+	//
+	tee := io.TeeReader(&buffer, &buf1)
+
+	// return empty list if there is no items searched
+	var emptyResponse struct {
+		List []string `json:"list"`
 	}
-	if err := resp.JSON(&response); err != nil {
+	if err := json.NewDecoder(tee).Decode(&emptyResponse); err == nil {
 		return nil, err
 	}
 
-	return response.List, nil
-}
-
-// Delete delete article
-func (a *ArticlesAPI) Delete(itemID string) error {
-	type action struct {
-		Action string  `json:"action"`
-		ItemID string  `json:"item_id"`
-		Time   *string `json:"time"`
+	var response ArticleGetResponse
+	if err := json.NewDecoder(&buf1).Decode(&response); err != nil {
+		errors.Wrap(err, "JSON marshal failed")
+		return nil, err
 	}
 
-	actions := []action{{Action: "delete", ItemID: itemID}}
+	return *response.List, nil
+}
+
+type articleActionParam struct {
+	Action string `json:"action"`
+	ItemID string `json:"item_id"`
+	Time   string `json:"time,omitempty"`
+}
+
+type articleActionResults struct {
+	ActionResults []bool `json:"action_results"`
+	Status        int    `json:"status"`
+}
+
+func (a *ArticlesAPI) sendAction(actions []articleActionParam) (*articleActionResults, error) {
 	var buf bytes.Buffer
 	json.NewEncoder(&buf).Encode(&actions)
 
-	log.Infof("remove item: %s", itemID)
+	log.Debugf("actions: %+v", actions)
 	resp, err := a.pocket.sess.Post("https://getpocket.com/v3/send").
 		Form("consumer_key", a.pocket.consumerKey).
 		Form("access_token", a.pocket.accessToken).
 		Form("actions", buf.String()).
 		Do()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if !resp.Success() {
-		return fmt.Errorf("failed with status %d", resp.StatusCode)
+		return nil, fmt.Errorf("failed with status %d", resp.StatusCode)
+	}
+
+	var response articleActionResults
+	if err := resp.JSON(&response); err != nil {
+		return nil, errors.Wrapf(err, "read json failed: %s", err)
+	}
+	log.Debugf("resp: %+v", response)
+
+	if !response.ActionResults[0] {
+		return nil, fmt.Errorf("delete failed: %v, %d", response.ActionResults[0], response.Status)
+	}
+
+	return &response, nil
+}
+
+// Delete delete article by item id
+// NOTE Delete action always success ㅡㅡ;
+func (a *ArticlesAPI) Delete(itemIDs ...string) error {
+	log.Debugf("remove item: %s", itemIDs)
+
+	params := make([]articleActionParam, len(itemIDs))
+	for i := 0; i < len(itemIDs); i++ {
+		params[i].Action = "delete"
+		params[i].ItemID = itemIDs[i]
+	}
+
+	_, err := a.sendAction(params)
+	if err != nil {
+		return errors.Wrapf(err, "delete item failed: %s", err)
 	}
 
 	return nil
 }
 
-func getRandomPickURL(accessToken string) (string, error) {
+// TODO(need refactor) cache를 넘기는게 좀 그렇네..
+func getRandomPickURL(cache *bigcache.BigCache, accessToken string) (string, error) {
 	api := NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), accessToken)
-	list, err := api.Articles.Get()
+
+	key := fmt.Sprintf("favorites/%s", accessToken)
+	data, err := cache.Get(key)
+	var articleList map[string]Article
 	if err != nil {
-		return "", err
+		if err != bigcache.ErrEntryNotFound {
+			return "", errors.Wrap(err, "bigcache error")
+		}
+
+		articleList, err = api.Articles.Get(GetOpts{Favorite: Favorited})
+		if err != nil {
+			return "", errors.Wrap(err, "getArticles failed")
+		}
+		log.Debugf("you have %d articles", len(articleList))
+
+		// write to cache
+		var buf bytes.Buffer
+		if err := json.NewEncoder(&buf).Encode(articleList); err != nil {
+			return "", errors.Wrap(err, "json encode failed")
+		}
+		cache.Set(key, buf.Bytes())
+	} else {
+		log.Infof("load articles from cache")
+		articleList = make(map[string]Article)
+		buf := bytes.NewBuffer(data)
+		if err := json.NewDecoder(buf).Decode(&articleList); err != nil {
+			return "", errors.Wrap(err, "json decode failed")
+		}
 	}
 
-	log.Infof("you have %d articles", len(list))
-	pick := rand.Intn(len(list))
+	// random pick from articles
+	pick := rand.Intn(len(articleList))
 
 	selected := ""
 	i := 0
-	for k := range list {
+	for k := range articleList {
 		if i == pick-1 {
 			selected = k
 			break
@@ -182,8 +289,8 @@ func getRandomPickURL(accessToken string) (string, error) {
 		i++
 	}
 
-	v := list[selected]
-	log.Infof("article: %+v", v)
+	v := articleList[selected]
+	log.Debugf("article: %+v", v)
 	if v.IsArticle == "1" {
 		return fmt.Sprintf("https://app.getpocket.com/read/%s", v.ItemID), nil
 	}
