@@ -268,7 +268,7 @@ func getRandomPickURL(cache *bigcache.BigCache, accessToken string) (string, err
 		}
 		cache.Set(key, buf.Bytes())
 	} else {
-		log.Infof("load articles from cache")
+		log.Debug("load articles from cache")
 		articleList = make(map[string]Article)
 		buf := bytes.NewBuffer(data)
 		if err := json.NewDecoder(buf).Decode(&articleList); err != nil {

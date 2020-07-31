@@ -29,7 +29,10 @@ func New() *Service {
 		panic("ROOT_URL required")
 	}
 
-	cache, _ := bigcache.NewBigCache(bigcache.DefaultConfig(time.Hour))
+	config := bigcache.DefaultConfig(time.Hour)
+	config.CleanWindow = time.Minute
+
+	cache, _ := bigcache.NewBigCache(config)
 
 	return &Service{
 		cache:   cache,
