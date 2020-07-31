@@ -123,7 +123,7 @@ func (s *Service) getIndex(c echo.Context) error {
 	}
 
 	accessToken := sess.Values[keyAccessToken].(string)
-	log.Infof("accessToken acquired, get random favorite pick: %s", accessToken)
+	log.Debugf("accessToken acquired, get random favorite pick: %s", accessToken)
 	url, err := getRandomPickURL(s.cache, accessToken)
 	if err != nil {
 		log.Errorf("error: %s", err)
@@ -154,12 +154,12 @@ func (s *Service) getAuth(c echo.Context) (err error) {
 			return c.Redirect(http.StatusFound, s.rootURL)
 		}
 
-		log.Infof("get accessToken %s", accessToken)
+		log.Debugf("get accessToken %s", accessToken)
 		sess.Values[keyAccessToken] = accessToken
 		sess.Save(c.Request(), c.Response())
 	}
 
-	log.Infof("redirect to root to read a item")
+	log.Debug("redirect to root to read a item")
 	return c.Redirect(http.StatusFound, s.rootURL)
 }
 

@@ -16,7 +16,7 @@ func CheckDeadLink() error {
 	if err != nil {
 		return errors.Wrap(err, "get articles failed")
 	}
-	log.Infof("items: %d", len(items))
+	log.Debug("items: %d", len(items))
 
 	ch := make(chan Article)
 
@@ -56,7 +56,7 @@ func CheckDeadLink() error {
 				}
 
 				if !resp.Success() {
-					log.Infof("failed with %d, itemID: %s, link: %s", resp.StatusCode, article.ItemID, article.ResolvedURL)
+					log.Errorf("failed with %d, itemID: %s, link: %s", resp.StatusCode, article.ItemID, article.ResolvedURL)
 					itemsToDelete = append(itemsToDelete, article.ItemID)
 				}
 			}
