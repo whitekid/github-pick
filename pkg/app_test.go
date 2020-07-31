@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -42,10 +43,11 @@ func TestIndex(t *testing.T) {
 	ts, teardown := newTestServer()
 	defer teardown()
 
-	resp, err := request.Get("%s/", ts.URL).Do()
+	// check if redirect to authorize url
+	resp, err := request.Get("%s", ts.URL).FollowRedirect(false).Do()
 	require.NoError(t, err)
-
 	require.Equal(t, http.StatusFound, resp.StatusCode)
+	require.True(t, strings.HasPrefix(resp.Header.Get("Location"), "https://getpocket.com/auth/authorize?request_token="), resp.Header.Get("Location"))
 }
 
 func TestAuth(t *testing.T) {

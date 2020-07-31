@@ -13,8 +13,8 @@ import (
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/spf13/viper"
 	log "github.com/whitekid/go-utils/logging"
+	"github.com/whitekid/pocket-pick/pkg/config"
 )
 
 const (
@@ -50,7 +50,7 @@ type Service struct {
 func (s *Service) Serve(ctx context.Context, args ...string) error {
 	e := s.setupRoute()
 
-	return e.Start(viper.GetString(KeyBind))
+	return e.Start(config.BindAddr())
 }
 
 func (s *Service) setupRoute() *echo.Echo {
@@ -60,16 +60,16 @@ func (s *Service) setupRoute() *echo.Echo {
 	e.Use(middleware.LoggerWithConfig(loggerConfig))
 	e.Use(session.Middleware(sessions.NewCookieStore([]byte("secret"))))
 
-	e.GET("/", s.getIndex)
-	e.GET("/auth", s.getAuth)
-	e.GET("/article/:item_id", s.getArticle) // TODO 원래는 DELETE로 해야하는데, 귀찮아서..
-	e.GET("/sessions", s.getSession)
+	e.GET("/", s.handleGetIndex)
+	e.GET("/auth", s.handleGetAuth)
+	e.GET("/article/:item_id", s.handleGetArticle) // TODO 원래는 DELETE로 해야하는데, 귀찮아서..
+	e.GET("/sessions", s.handleGetSession)
 
 	return e
 }
 
 func (s *Service) session(c echo.Context) *sessions.Session {
-	sess, _ := session.Get("session", c)
+	sess, _ := session.Get("pocket-pick-session", c)
 	sess.Options = &sessions.Options{
 		Path:     "/",
 		MaxAge:   86400,
@@ -79,7 +79,7 @@ func (s *Service) session(c echo.Context) *sessions.Session {
 	return sess
 }
 
-func (s *Service) getSession(c echo.Context) error {
+func (s *Service) handleGetSession(c echo.Context) error {
 	sess := s.session(c)
 	if sess.Values["foo"] == nil {
 		sess.Values["foo"] = "0"
@@ -100,7 +100,7 @@ func (s *Service) getSession(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-func (s *Service) getIndex(c echo.Context) error {
+func (s *Service) handleGetIndex(c echo.Context) error {
 	sess := s.session(c)
 
 	// if not token, try to authorize
@@ -111,7 +111,7 @@ func (s *Service) getIndex(c echo.Context) error {
 		}
 
 		sess.Values[keyRequestToken] = requestToken
-		c.Logger().Infof("save requestToken to session: %s", requestToken)
+		log.Infof("save requestToken to session: %s", requestToken)
 		sess.Save(c.Request(), c.Response())
 		return c.Redirect(http.StatusFound, authorizedURL)
 	}
@@ -134,7 +134,7 @@ func (s *Service) getIndex(c echo.Context) error {
 	return c.Redirect(http.StatusFound, url)
 }
 
-func (s *Service) getAuth(c echo.Context) (err error) {
+func (s *Service) handleGetAuth(c echo.Context) (err error) {
 	sess := s.session(c)
 
 	if _, exists := sess.Values[keyRequestToken]; !exists {
@@ -150,7 +150,9 @@ func (s *Service) getAuth(c echo.Context) (err error) {
 		}
 
 		if accessToken == "" {
-			sess.Values[keyAccessToken] = nil
+			delete(sess.Values, keyAccessToken)
+			sess.Save(c.Request(), c.Response())
+
 			return c.Redirect(http.StatusFound, s.rootURL)
 		}
 
@@ -177,7 +179,7 @@ func (s *Service) requireAccessToken(c echo.Context, token *string) error {
 }
 
 // remove given article
-func (s *Service) getArticle(c echo.Context) error {
+func (s *Service) handleGetArticle(c echo.Context) error {
 	itemID := c.Param("item_id")
 	if itemID == "" {
 		return c.String(http.StatusBadRequest, "ItemID missed")

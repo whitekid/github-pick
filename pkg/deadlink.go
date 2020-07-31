@@ -14,7 +14,7 @@ func CheckDeadLink() error {
 	api := NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), os.Getenv("ACCESS_TOKEN"))
 	items, err := api.Articles.Get(GetOpts{Favorite: Favorited})
 	if err != nil {
-		return errors.Wrap(err, "get articles failed")
+		return errors.Wrap(err, "articles.Get(Favorite)")
 	}
 	log.Debug("items: %d", len(items))
 
@@ -68,7 +68,7 @@ func CheckDeadLink() error {
 	log.Infof("deleting: %v", itemsToDelete)
 
 	if err := api.Articles.Delete(itemsToDelete...); err != nil {
-		return errors.Wrap(err, "delete failed")
+		return errors.Wrapf(err, "articles.Delete(%s)", itemsToDelete)
 	}
 
 	return nil

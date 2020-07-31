@@ -175,7 +175,7 @@ func (a *ArticlesAPI) Get(opts GetOpts) (map[string]Article, error) {
 
 	var response ArticleGetResponse
 	if err := json.NewDecoder(&buf1).Decode(&response); err != nil {
-		errors.Wrap(err, "JSON marshal failed")
+		errors.Wrap(err, "JSONDecode")
 		return nil, err
 	}
 
@@ -213,7 +213,7 @@ func (a *ArticlesAPI) sendAction(actions []articleActionParam) (*articleActionRe
 
 	var response articleActionResults
 	if err := resp.JSON(&response); err != nil {
-		return nil, errors.Wrapf(err, "read json failed: %s", err)
+		return nil, errors.Wrapf(err, "decode response")
 	}
 	log.Debugf("resp: %+v", response)
 
@@ -237,7 +237,7 @@ func (a *ArticlesAPI) Delete(itemIDs ...string) error {
 
 	_, err := a.sendAction(params)
 	if err != nil {
-		return errors.Wrapf(err, "delete item failed: %s", err)
+		return errors.Wrapf(err, "delete(%s)", itemIDs)
 	}
 
 	return nil
@@ -247,32 +247,33 @@ func (a *ArticlesAPI) Delete(itemIDs ...string) error {
 func getRandomPickURL(cache *bigcache.BigCache, accessToken string) (string, error) {
 	api := NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), accessToken)
 
-	key := fmt.Sprintf("favorites/%s", accessToken)
+	key := fmt.Sprintf("%s/favorites", accessToken)
 	data, err := cache.Get(key)
 	var articleList map[string]Article
 	if err != nil {
 		if err != bigcache.ErrEntryNotFound {
-			return "", errors.Wrap(err, "bigcache error")
+			return "", errors.Wrapf(err, "set cache: %s", key)
 		}
 
 		articleList, err = api.Articles.Get(GetOpts{Favorite: Favorited})
 		if err != nil {
-			return "", errors.Wrap(err, "getArticles failed")
+			return "", errors.Wrap(err, "getArticles")
 		}
 		log.Debugf("you have %d articles", len(articleList))
 
 		// write to cache
 		var buf bytes.Buffer
 		if err := json.NewEncoder(&buf).Encode(articleList); err != nil {
-			return "", errors.Wrap(err, "json encode failed")
+			return "", errors.Wrap(err, "json encode")
 		}
 		cache.Set(key, buf.Bytes())
 	} else {
 		log.Debug("load articles from cache")
+
 		articleList = make(map[string]Article)
 		buf := bytes.NewBuffer(data)
 		if err := json.NewDecoder(buf).Decode(&articleList); err != nil {
-			return "", errors.Wrap(err, "json decode failed")
+			return "", errors.Wrap(err, "json decode")
 		}
 	}
 

@@ -33,7 +33,7 @@ func deleteArticle(itemIDs ...string) error {
 				Search: arg,
 			})
 			if err != nil {
-				return errors.Wrapf(err, "search failed: %s", err)
+				return errors.Wrapf(err, "articles.Get(%+v)", arg)
 			}
 
 			if len(items) != 1 {
@@ -43,7 +43,7 @@ func deleteArticle(itemIDs ...string) error {
 			for _, v := range items {
 				log.Infof("deleting %s, %s", v.ItemID, v.ResolvedURL)
 				if err := api.Articles.Delete(v.ItemID); err != nil {
-					errors.Wrapf(err, "delete failed: %s", err)
+					errors.Wrapf(err, "articles.Delete(%s)", v.ItemID)
 					return err
 				}
 			}
@@ -55,7 +55,7 @@ func deleteArticle(itemIDs ...string) error {
 
 			log.Infof("deleting item %s", arg)
 			if err := api.Articles.Delete(arg); err != nil {
-				return errors.Wrapf(err, "delete failed item: %s", arg)
+				return errors.Wrapf(err, "articles.Delete(%s)", arg)
 			}
 		}
 	}

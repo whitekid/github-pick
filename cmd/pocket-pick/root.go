@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"math/rand"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	pocket "github.com/whitekid/pocket-pick/pkg"
+	"github.com/whitekid/pocket-pick/pkg/config"
 )
 
 var rootCmd = &cobra.Command{
@@ -16,12 +19,13 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
+	rand.Seed(time.Now().UnixNano())
 	cobra.OnInitialize(initConfig)
 
 	fs := rootCmd.Flags()
 
-	fs.StringP(pocket.KeyBind, "B", "127.0.0.1:8000", "bind address")
-	viper.BindPFlag(pocket.KeyBind, fs.Lookup(pocket.KeyBind))
+	fs.StringP(config.KeyBind, "B", "127.0.0.1:8000", "bind address")
+	viper.BindPFlag(config.KeyBind, fs.Lookup(config.KeyBind))
 }
 
 func initConfig() {
