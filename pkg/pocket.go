@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"os"
 	"strconv"
 
 	"github.com/allegro/bigcache"
 	"github.com/pkg/errors"
-	log "github.com/whitekid/go-utils/logging"
+	"github.com/whitekid/go-utils/log"
 	"github.com/whitekid/go-utils/request"
+	"github.com/whitekid/pocket-pick/pkg/config"
 )
 
 // GetPocketAPI get pocket api
@@ -244,27 +244,27 @@ func (a *ArticlesAPI) Delete(itemIDs ...string) error {
 }
 
 // TODO(need refactor) cache를 넘기는게 좀 그렇네..
-func getRandomPickURL(cache *bigcache.BigCache, accessToken string) (string, error) {
-	api := NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), accessToken)
+func getRandomPickArticle(cache *bigcache.BigCache, accessToken string) (*Article, error) {
+	api := NewGetPocketAPI(config.ConsumerKey(), accessToken)
 
 	key := fmt.Sprintf("%s/favorites", accessToken)
 	data, err := cache.Get(key)
 	var articleList map[string]Article
 	if err != nil {
 		if err != bigcache.ErrEntryNotFound {
-			return "", errors.Wrapf(err, "set cache: %s", key)
+			return nil, errors.Wrapf(err, "set cache: %s", key)
 		}
 
 		articleList, err = api.Articles.Get(GetOpts{Favorite: Favorited})
 		if err != nil {
-			return "", errors.Wrap(err, "getArticles")
+			return nil, errors.Wrap(err, "getArticles")
 		}
 		log.Debugf("you have %d articles", len(articleList))
 
 		// write to cache
 		var buf bytes.Buffer
 		if err := json.NewEncoder(&buf).Encode(articleList); err != nil {
-			return "", errors.Wrap(err, "json encode")
+			return nil, errors.Wrap(err, "json encode")
 		}
 		cache.Set(key, buf.Bytes())
 	} else {
@@ -273,7 +273,7 @@ func getRandomPickURL(cache *bigcache.BigCache, accessToken string) (string, err
 		articleList = make(map[string]Article)
 		buf := bytes.NewBuffer(data)
 		if err := json.NewDecoder(buf).Decode(&articleList); err != nil {
-			return "", errors.Wrap(err, "json decode")
+			return nil, errors.Wrap(err, "json decode")
 		}
 	}
 
@@ -292,8 +292,5 @@ func getRandomPickURL(cache *bigcache.BigCache, accessToken string) (string, err
 
 	v := articleList[selected]
 	log.Debugf("article: %+v", v)
-	if v.IsArticle == "1" {
-		return fmt.Sprintf("https://app.getpocket.com/read/%s", v.ItemID), nil
-	}
-	return v.ResolvedURL, nil
+	return &v, nil
 }

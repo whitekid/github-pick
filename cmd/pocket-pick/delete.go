@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	log "github.com/whitekid/go-utils/logging"
+	"github.com/whitekid/go-utils/log"
 	pocket "github.com/whitekid/pocket-pick/pkg"
+	"github.com/whitekid/pocket-pick/pkg/config"
 )
 
 func init() {
@@ -25,7 +25,7 @@ func init() {
 }
 
 func deleteArticle(itemIDs ...string) error {
-	api := pocket.NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), os.Getenv("ACCESS_TOKEN"))
+	api := pocket.NewGetPocketAPI(config.ConsumerKey(), config.AccessToken())
 	for _, arg := range itemIDs {
 		// delete by url
 		if strings.HasPrefix(arg, "http://") || strings.HasPrefix(arg, "https://") {

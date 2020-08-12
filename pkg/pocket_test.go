@@ -1,10 +1,10 @@
 package pocket
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/whitekid/pocket-pick/pkg/config"
 )
 
 func TestGetAuthorizedURL(t *testing.T) {
@@ -34,7 +34,7 @@ func TestArticleSearch(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			api := NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), os.Getenv("ACCESS_TOKEN"))
+			api := NewGetPocketAPI(config.ConsumerKey(), config.AccessToken())
 			items, err := api.Articles.Get(GetOpts{
 				Search: tt.args.url,
 			})
@@ -50,6 +50,6 @@ func TestArticleSearch(t *testing.T) {
 }
 
 func TestArticleDelete(t *testing.T) {
-	api := NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), os.Getenv("ACCESS_TOKEN"))
+	api := NewGetPocketAPI(config.ConsumerKey(), config.AccessToken())
 	require.NoError(t, api.Articles.Delete("567640688"))
 }

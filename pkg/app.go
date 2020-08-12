@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -13,7 +12,8 @@ import (
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	log "github.com/whitekid/go-utils/logging"
+	"github.com/whitekid/go-utils/log"
+	"github.com/whitekid/go-utils/service"
 	"github.com/whitekid/pocket-pick/pkg/config"
 )
 
@@ -22,9 +22,10 @@ const (
 	keyAccessToken  = "ACCESS_TOKEN"
 )
 
-// New implements service interface
-func New() *Service {
-	rootURL := os.Getenv("ROOT_URL")
+// New return pocket-pick service object
+// implements service interface
+func New() service.Interface {
+	rootURL := config.RootURL()
 	if rootURL == "" {
 		panic("ROOT_URL required")
 	}
@@ -34,26 +35,25 @@ func New() *Service {
 
 	cache, _ := bigcache.NewBigCache(config)
 
-	return &Service{
+	return &pocketService{
 		cache:   cache,
 		rootURL: rootURL,
 	}
 }
 
-// Service the main service
-type Service struct {
+type pocketService struct {
 	rootURL string
 	cache   *bigcache.BigCache // for api cache
 }
 
 // Serve serve the main service
-func (s *Service) Serve(ctx context.Context, args ...string) error {
+func (s *pocketService) Serve(ctx context.Context, args ...string) error {
 	e := s.setupRoute()
 
 	return e.Start(config.BindAddr())
 }
 
-func (s *Service) setupRoute() *echo.Echo {
+func (s *pocketService) setupRoute() *echo.Echo {
 	e := echo.New()
 
 	loggerConfig := middleware.DefaultLoggerConfig
@@ -68,7 +68,7 @@ func (s *Service) setupRoute() *echo.Echo {
 	return e
 }
 
-func (s *Service) session(c echo.Context) *sessions.Session {
+func (s *pocketService) session(c echo.Context) *sessions.Session {
 	sess, _ := session.Get("pocket-pick-session", c)
 	sess.Options = &sessions.Options{
 		Path:     "/",
@@ -79,7 +79,7 @@ func (s *Service) session(c echo.Context) *sessions.Session {
 	return sess
 }
 
-func (s *Service) handleGetSession(c echo.Context) error {
+func (s *pocketService) handleGetSession(c echo.Context) error {
 	sess := s.session(c)
 	if sess.Values["foo"] == nil {
 		sess.Values["foo"] = "0"
@@ -100,12 +100,13 @@ func (s *Service) handleGetSession(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-func (s *Service) handleGetIndex(c echo.Context) error {
+func (s *pocketService) handleGetIndex(c echo.Context) error {
 	sess := s.session(c)
 
 	// if not token, try to authorize
 	if _, exists := sess.Values[keyRequestToken]; !exists {
-		requestToken, authorizedURL, err := NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), "").AuthorizedURL(fmt.Sprintf("%s/auth", s.rootURL))
+		// TODO move to middleware, context...
+		requestToken, authorizedURL, err := NewGetPocketAPI(config.ConsumerKey(), "").AuthorizedURL(fmt.Sprintf("%s/auth", s.rootURL))
 		if err != nil {
 			return err
 		}
@@ -124,17 +125,22 @@ func (s *Service) handleGetIndex(c echo.Context) error {
 
 	accessToken := sess.Values[keyAccessToken].(string)
 	log.Debugf("accessToken acquired, get random favorite pick: %s", accessToken)
-	url, err := getRandomPickURL(s.cache, accessToken)
+	article, err := getRandomPickArticle(s.cache, accessToken)
 	if err != nil {
 		log.Errorf("error: %s", err)
 		return err
 	}
 
-	log.Infof("move to %s", url)
+	url := fmt.Sprintf("https://app.getpocket.com/read/%s", article.ItemID)
+	if article.IsArticle == "1" {
+		url = article.ResolvedURL
+	}
+
+	log.Infof("move to %s, resolved: %s", url, article.ResolvedURL)
 	return c.Redirect(http.StatusFound, url)
 }
 
-func (s *Service) handleGetAuth(c echo.Context) (err error) {
+func (s *pocketService) handleGetAuth(c echo.Context) (err error) {
 	sess := s.session(c)
 
 	if _, exists := sess.Values[keyRequestToken]; !exists {
@@ -143,7 +149,7 @@ func (s *Service) handleGetAuth(c echo.Context) (err error) {
 
 	requestToken := sess.Values[keyRequestToken].(string)
 	if _, exists := sess.Values[keyAccessToken]; !exists {
-		accessToken, _, err := NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), "").AccessToken(requestToken)
+		accessToken, _, err := NewGetPocketAPI(config.ConsumerKey(), "").AccessToken(requestToken)
 		if err != nil {
 			log.Errorf("fail to get access token: %s", err)
 			return err
@@ -165,7 +171,7 @@ func (s *Service) handleGetAuth(c echo.Context) (err error) {
 	return c.Redirect(http.StatusFound, s.rootURL)
 }
 
-func (s *Service) requireAccessToken(c echo.Context, token *string) error {
+func (s *pocketService) requireAccessToken(c echo.Context, token *string) error {
 	sess := s.session(c)
 
 	if _, exists := sess.Values[keyAccessToken]; !exists {
@@ -179,7 +185,7 @@ func (s *Service) requireAccessToken(c echo.Context, token *string) error {
 }
 
 // remove given article
-func (s *Service) handleGetArticle(c echo.Context) error {
+func (s *pocketService) handleGetArticle(c echo.Context) error {
 	itemID := c.Param("item_id")
 	if itemID == "" {
 		return c.String(http.StatusBadRequest, "ItemID missed")
@@ -191,7 +197,7 @@ func (s *Service) handleGetArticle(c echo.Context) error {
 		return c.Redirect(http.StatusFound, s.rootURL)
 	}
 
-	if err := NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), accessToken).Articles.Delete(itemID); err != nil {
+	if err := NewGetPocketAPI(config.ConsumerKey(), accessToken).Articles.Delete(itemID); err != nil {
 		log.Errorf("failed: %s", err)
 		return err
 	}

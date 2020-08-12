@@ -25,3 +25,6 @@ dep:
 
 tidy:
 	go mod tidy
+
+swag:
+	swag init -d pkg  -g app.go

@@ -1,17 +1,17 @@
 package pocket
 
 import (
-	"os"
 	"sync"
 
 	"github.com/pkg/errors"
-	log "github.com/whitekid/go-utils/logging"
+	"github.com/whitekid/go-utils/log"
 	"github.com/whitekid/go-utils/request"
+	"github.com/whitekid/pocket-pick/pkg/config"
 )
 
 // CheckDeadLink ...
 func CheckDeadLink() error {
-	api := NewGetPocketAPI(os.Getenv("CONSUMER_KEY"), os.Getenv("ACCESS_TOKEN"))
+	api := NewGetPocketAPI(config.ConsumerKey(), config.AccessToken())
 	items, err := api.Articles.Get(GetOpts{Favorite: Favorited})
 	if err != nil {
 		return errors.Wrap(err, "articles.Get(Favorite)")

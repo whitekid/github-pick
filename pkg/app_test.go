@@ -14,7 +14,7 @@ import (
 )
 
 func newTestServer() (*httptest.Server, func()) {
-	s := New()
+	s := New().(*pocketService)
 	e := s.setupRoute()
 
 	ts := httptest.NewServer(e)
