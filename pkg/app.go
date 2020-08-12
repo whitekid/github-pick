@@ -12,6 +12,7 @@ import (
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/pkg/errors"
 	"github.com/whitekid/go-utils/log"
 	"github.com/whitekid/go-utils/service"
 	"github.com/whitekid/pocket-pick/pkg/config"
@@ -30,7 +31,7 @@ func New() service.Interface {
 		panic("ROOT_URL required")
 	}
 
-	config := bigcache.DefaultConfig(time.Hour)
+	config := bigcache.DefaultConfig(config.CacheEvictionTimeout())
 	config.CleanWindow = time.Minute
 
 	cache, _ := bigcache.NewBigCache(config)
@@ -58,7 +59,20 @@ func (s *pocketService) setupRoute() *echo.Echo {
 
 	loggerConfig := middleware.DefaultLoggerConfig
 	e.Use(middleware.LoggerWithConfig(loggerConfig))
-	e.Use(session.Middleware(sessions.NewCookieStore([]byte("secret"))))
+	e.Use(session.Middleware(sessions.NewCookieStore([]byte("secret"))),
+		func(next echo.HandlerFunc) echo.HandlerFunc {
+			return func(c echo.Context) error {
+				sess, _ := session.Get("pocket-pick-session", c)
+				sess.Options = &sessions.Options{
+					Path:     "/",
+					MaxAge:   86400,
+					HttpOnly: true,
+				}
+
+				c.Set("session", sess)
+				return next(c)
+			}
+		})
 
 	e.GET("/", s.handleGetIndex)
 	e.GET("/auth", s.handleGetAuth)
@@ -69,14 +83,7 @@ func (s *pocketService) setupRoute() *echo.Echo {
 }
 
 func (s *pocketService) session(c echo.Context) *sessions.Session {
-	sess, _ := session.Get("pocket-pick-session", c)
-	sess.Options = &sessions.Options{
-		Path:     "/",
-		MaxAge:   86400,
-		HttpOnly: true,
-	}
-
-	return sess
+	return c.Get("session").(*sessions.Session)
 }
 
 func (s *pocketService) handleGetSession(c echo.Context) error {
@@ -108,7 +115,7 @@ func (s *pocketService) handleGetIndex(c echo.Context) error {
 		// TODO move to middleware, context...
 		requestToken, authorizedURL, err := NewGetPocketAPI(config.ConsumerKey(), "").AuthorizedURL(fmt.Sprintf("%s/auth", s.rootURL))
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "authorize failed")
 		}
 
 		sess.Values[keyRequestToken] = requestToken
@@ -188,7 +195,7 @@ func (s *pocketService) requireAccessToken(c echo.Context, token *string) error 
 func (s *pocketService) handleGetArticle(c echo.Context) error {
 	itemID := c.Param("item_id")
 	if itemID == "" {
-		return c.String(http.StatusBadRequest, "ItemID missed")
+		return echo.NewHTTPError(http.StatusBadRequest, "ItemID missed")
 	}
 
 	var accessToken string

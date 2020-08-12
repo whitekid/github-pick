@@ -9,10 +9,11 @@ import (
 )
 
 const (
-	keyBind        = "bind_addr"
-	keyRootURL     = "root-url"
-	keyConsumerKey = "consumer-key"
-	keyAccessToken = "access-token"
+	keyBind         = "bind_addr"
+	keyRootURL      = "root_url"
+	keyConsumerKey  = "consumer_key"
+	keyAccessToken  = "access_token"
+	keyCacheTimeout = "favorite_cache_timeout"
 )
 
 var configs = map[string][]struct {
@@ -26,13 +27,15 @@ var configs = map[string][]struct {
 		{keyRootURL, "r", "http://127.0.0.0:8000", "root url"},
 		{keyConsumerKey, "k", "", "getpocket consumer key"},
 		{keyAccessToken, "a", "", "getpocket access token"},
+		{keyCacheTimeout, "", time.Hour, "timeout for cache favorite items"},
 	},
 }
 
-func BindAddr() string    { return viper.GetString(keyBind) }
-func RootURL() string     { return viper.GetString(keyRootURL) }
-func ConsumerKey() string { return viper.GetString(keyConsumerKey) }
-func AccessToken() string { return viper.GetString(keyAccessToken) }
+func BindAddr() string                    { return viper.GetString(keyBind) }
+func RootURL() string                     { return viper.GetString(keyRootURL) }
+func ConsumerKey() string                 { return viper.GetString(keyConsumerKey) }
+func AccessToken() string                 { return viper.GetString(keyAccessToken) }
+func CacheEvictionTimeout() time.Duration { return viper.GetDuration(keyCacheTimeout) }
 
 func init() {
 	// InitDefaults initialize config
