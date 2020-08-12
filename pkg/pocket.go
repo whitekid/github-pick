@@ -7,12 +7,12 @@ import (
 	"io"
 	"math/rand"
 	"strconv"
+	"time"
 
-	"github.com/allegro/bigcache"
+	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
 	"github.com/whitekid/go-utils/log"
 	"github.com/whitekid/go-utils/request"
-	"github.com/whitekid/pocket-pick/pkg/config"
 )
 
 // GetPocketAPI get pocket api
@@ -24,6 +24,10 @@ type GetPocketAPI struct {
 
 	// API interfaces
 	Articles *ArticlesAPI
+}
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
 }
 
 // NewGetPocketAPI create GetPocket API
@@ -49,12 +53,14 @@ type Article struct {
 
 // AuthorizedURL get authorizedURL
 func (g *GetPocketAPI) AuthorizedURL(redirectURL string) (string, string, error) {
-	resp, err := g.sess.Post("https://getpocket.com/v3/oauth/request").Header("X-Accept", "application/json").JSON(
-		map[string]string{
-			"consumer_key": g.consumerKey,
-			"redirect_uri": redirectURL,
-		},
-	).Do()
+	resp, err := g.sess.Post("https://getpocket.com/v3/oauth/request").
+		Header(echo.HeaderAccept, echo.MIMEApplicationJSONCharsetUTF8).
+		JSON(
+			map[string]string{
+				"consumer_key": g.consumerKey,
+				"redirect_uri": redirectURL,
+			},
+		).Do()
 
 	if err != nil {
 		return "", "", err
@@ -75,11 +81,12 @@ func (g *GetPocketAPI) AuthorizedURL(redirectURL string) (string, string, error)
 	return response.Code, fmt.Sprintf("https://getpocket.com/auth/authorize?request_token=%s&redirect_uri=%s", response.Code, redirectURL), nil
 }
 
-// AccessToken get accessToken, username from requestToken using oauth
-func (g *GetPocketAPI) AccessToken(requestToken string) (string, string, error) {
+// NewAccessToken get accessToken, username from requestToken using oauth
+func (g *GetPocketAPI) NewAccessToken(requestToken string) (string, string, error) {
 	log.Debugf("getAccessToken with %s", requestToken)
 
-	resp, err := g.sess.Post("https://getpocket.com/v3/oauth/authorize").Header("X-Accept", "application/json").
+	resp, err := g.sess.Post("https://getpocket.com/v3/oauth/authorize").
+		Header(echo.HeaderAccept, echo.MIMEApplicationJSONCharsetUTF8).
 		JSON(map[string]string{
 			"consumer_key": g.consumerKey,
 			"code":         requestToken,
@@ -148,7 +155,8 @@ func (a *ArticlesAPI) Get(opts GetOpts) (map[string]Article, error) {
 	}
 
 	resp, err := a.pocket.sess.Post("https://getpocket.com/v3/get").
-		Header("X-Accept", "application/json").JSON(params).Do()
+		Header(echo.HeaderAccept, echo.MIMEApplicationJSONCharsetUTF8).
+		JSON(params).Do()
 	if err != nil {
 		return nil, err
 	}
@@ -241,56 +249,4 @@ func (a *ArticlesAPI) Delete(itemIDs ...string) error {
 	}
 
 	return nil
-}
-
-// TODO(need refactor) cache를 넘기는게 좀 그렇네..
-func getRandomPickArticle(cache *bigcache.BigCache, accessToken string) (*Article, error) {
-	api := NewGetPocketAPI(config.ConsumerKey(), accessToken)
-
-	key := fmt.Sprintf("%s/favorites", accessToken)
-	data, err := cache.Get(key)
-	var articleList map[string]Article
-	if err != nil {
-		if err != bigcache.ErrEntryNotFound {
-			return nil, errors.Wrapf(err, "set cache: %s", key)
-		}
-
-		articleList, err = api.Articles.Get(GetOpts{Favorite: Favorited})
-		if err != nil {
-			return nil, errors.Wrap(err, "getArticles")
-		}
-		log.Debugf("you have %d articles", len(articleList))
-
-		// write to cache
-		var buf bytes.Buffer
-		if err := json.NewEncoder(&buf).Encode(articleList); err != nil {
-			return nil, errors.Wrap(err, "json encode")
-		}
-		cache.Set(key, buf.Bytes())
-	} else {
-		log.Debug("load articles from cache")
-
-		articleList = make(map[string]Article)
-		buf := bytes.NewBuffer(data)
-		if err := json.NewDecoder(buf).Decode(&articleList); err != nil {
-			return nil, errors.Wrap(err, "json decode")
-		}
-	}
-
-	// random pick from articles
-	pick := rand.Intn(len(articleList))
-
-	selected := ""
-	i := 0
-	for k := range articleList {
-		if i == pick-1 {
-			selected = k
-			break
-		}
-		i++
-	}
-
-	v := articleList[selected]
-	log.Debugf("article: %+v", v)
-	return &v, nil
 }

@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"math/rand"
-	"time"
 
 	"github.com/spf13/cobra"
 	pocket "github.com/whitekid/pocket-pick/pkg"
@@ -18,7 +16,6 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rand.Seed(time.Now().UnixNano())
 	cobra.OnInitialize(config.InitConfig)
 
 	config.InitFlagSet(rootCmd.Use, rootCmd.Flags())

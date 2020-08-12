@@ -1,8 +1,11 @@
 package pocket
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"time"
@@ -112,7 +115,6 @@ func (s *pocketService) handleGetIndex(c echo.Context) error {
 
 	// if not token, try to authorize
 	if _, exists := sess.Values[keyRequestToken]; !exists {
-		// TODO move to middleware, context...
 		requestToken, authorizedURL, err := NewGetPocketAPI(config.ConsumerKey(), "").AuthorizedURL(fmt.Sprintf("%s/auth", s.rootURL))
 		if err != nil {
 			return errors.Wrapf(err, "authorize failed")
@@ -132,11 +134,54 @@ func (s *pocketService) handleGetIndex(c echo.Context) error {
 
 	accessToken := sess.Values[keyAccessToken].(string)
 	log.Debugf("accessToken acquired, get random favorite pick: %s", accessToken)
-	article, err := getRandomPickArticle(s.cache, accessToken)
+
+	key := fmt.Sprintf("%s/favorites", accessToken)
+	api := NewGetPocketAPI(config.ConsumerKey(), accessToken)
+
+	data, err := s.cache.Get(key)
+	var articleList map[string]Article
 	if err != nil {
-		log.Errorf("error: %s", err)
-		return err
+		if err != bigcache.ErrEntryNotFound {
+			return errors.Wrapf(err, "get cache failed: %s", key)
+		}
+
+		articleList, err = api.Articles.Get(GetOpts{Favorite: Favorited})
+		if err != nil {
+			return errors.Wrap(err, "get favorite artcles failed")
+		}
+		log.Debugf("you have %d articles", len(articleList))
+
+		// write to cache
+		buf, err := json.Marshal(articleList)
+		if err != nil {
+			return errors.Wrap(err, "json encode failed")
+		}
+		s.cache.Set(key, buf)
+	} else {
+		log.Debug("load articles from cache")
+
+		articleList = make(map[string]Article)
+		buf := bytes.NewBuffer(data)
+		if err := json.NewDecoder(buf).Decode(&articleList); err != nil {
+			return errors.Wrap(err, "json decode failed")
+		}
 	}
+
+	// random pick from articles
+	pick := rand.Intn(len(articleList))
+
+	selected := ""
+	i := 0
+	for k := range articleList {
+		if i == pick-1 {
+			selected = k
+			break
+		}
+		i++
+	}
+
+	article := articleList[selected]
+	log.Debugf("article: %+v", article)
 
 	url := fmt.Sprintf("https://app.getpocket.com/read/%s", article.ItemID)
 	if article.IsArticle == "1" {
@@ -156,7 +201,7 @@ func (s *pocketService) handleGetAuth(c echo.Context) (err error) {
 
 	requestToken := sess.Values[keyRequestToken].(string)
 	if _, exists := sess.Values[keyAccessToken]; !exists {
-		accessToken, _, err := NewGetPocketAPI(config.ConsumerKey(), "").AccessToken(requestToken)
+		accessToken, _, err := NewGetPocketAPI(config.ConsumerKey(), "").NewAccessToken(requestToken)
 		if err != nil {
 			log.Errorf("fail to get access token: %s", err)
 			return err
