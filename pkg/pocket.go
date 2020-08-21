@@ -51,14 +51,23 @@ type Article struct {
 	IsArticle   string `json:"is_article"`
 }
 
+func (g *GetPocketAPI) success(r *request.Response) error {
+	if r.Success() {
+		return nil
+	}
+	message := r.Header.Get("x-error")
+	code := r.Header.Get("x-error-code")
+	return fmt.Errorf("Error with status: %d, error=%s, code=%s", r.StatusCode, message, code)
+}
+
 // AuthorizedURL get authorizedURL
-func (g *GetPocketAPI) AuthorizedURL(redirectURL string) (string, string, error) {
-	resp, err := g.sess.Post("https://getpocket.com/v3/oauth/request").
-		Header(echo.HeaderAccept, echo.MIMEApplicationJSONCharsetUTF8).
+func (g *GetPocketAPI) AuthorizedURL(redirectURI string) (string, string, error) {
+	resp, err := request.Post("https://getpocket.com/v3/oauth/request").
+		Header("X-"+echo.HeaderAccept, echo.MIMEApplicationJSON).
 		JSON(
 			map[string]string{
 				"consumer_key": g.consumerKey,
-				"redirect_uri": redirectURL,
+				"redirect_uri": redirectURI,
 			},
 		).Do()
 
@@ -66,8 +75,8 @@ func (g *GetPocketAPI) AuthorizedURL(redirectURL string) (string, string, error)
 		return "", "", err
 	}
 
-	if !resp.Success() {
-		return "", "", fmt.Errorf("Error with status: %d", resp.StatusCode)
+	if err := g.success(resp); err != nil {
+		return "", "", errors.Wrap(err, "AutorizedURL failed")
 	}
 
 	var response struct {
@@ -78,7 +87,7 @@ func (g *GetPocketAPI) AuthorizedURL(redirectURL string) (string, string, error)
 		return "", "", err
 	}
 
-	return response.Code, fmt.Sprintf("https://getpocket.com/auth/authorize?request_token=%s&redirect_uri=%s", response.Code, redirectURL), nil
+	return response.Code, fmt.Sprintf("https://getpocket.com/auth/authorize?request_token=%s&redirect_uri=%s", response.Code, redirectURI), nil
 }
 
 // NewAccessToken get accessToken, username from requestToken using oauth
@@ -86,7 +95,7 @@ func (g *GetPocketAPI) NewAccessToken(requestToken string) (string, string, erro
 	log.Debugf("getAccessToken with %s", requestToken)
 
 	resp, err := g.sess.Post("https://getpocket.com/v3/oauth/authorize").
-		Header(echo.HeaderAccept, echo.MIMEApplicationJSONCharsetUTF8).
+		Header("X-"+echo.HeaderAccept, echo.MIMEApplicationJSON).
 		JSON(map[string]string{
 			"consumer_key": g.consumerKey,
 			"code":         requestToken,
@@ -95,7 +104,7 @@ func (g *GetPocketAPI) NewAccessToken(requestToken string) (string, string, erro
 		return "", "", err
 	}
 
-	if !resp.Success() {
+	if err := g.success(resp); err != nil {
 		return "", "", fmt.Errorf("Failed with status: %d", resp.StatusCode)
 	}
 
@@ -155,14 +164,14 @@ func (a *ArticlesAPI) Get(opts GetOpts) (map[string]Article, error) {
 	}
 
 	resp, err := a.pocket.sess.Post("https://getpocket.com/v3/get").
-		Header(echo.HeaderAccept, echo.MIMEApplicationJSONCharsetUTF8).
+		Header("X-"+echo.HeaderAccept, echo.MIMEApplicationJSON).
 		JSON(params).Do()
 	if err != nil {
 		return nil, err
 	}
 
-	if !resp.Success() {
-		return nil, fmt.Errorf("failed with status %d", resp.StatusCode)
+	if err := a.pocket.success(resp); err != nil {
+		return nil, errors.Wrapf(err, "Get()")
 	}
 
 	var buffer bytes.Buffer
@@ -215,8 +224,8 @@ func (a *ArticlesAPI) sendAction(actions []articleActionParam) (*articleActionRe
 		return nil, err
 	}
 
-	if !resp.Success() {
-		return nil, fmt.Errorf("failed with status %d", resp.StatusCode)
+	if err := a.pocket.success(resp); err != nil {
+		return nil, errors.Wrap(err, "sendAction()")
 	}
 
 	var response articleActionResults

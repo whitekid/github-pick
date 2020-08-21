@@ -46,9 +46,7 @@ func init() {
 			}
 		}
 	}
-}
 
-func InitConfig() {
 	viper.SetEnvPrefix("pp")
 	viper.AutomaticEnv()
 }

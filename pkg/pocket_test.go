@@ -8,10 +8,10 @@ import (
 )
 
 func TestGetAuthorizedURL(t *testing.T) {
-	api := NewGetPocketAPI("", "")
+	api := NewGetPocketAPI(config.ConsumerKey(), "")
 
 	token, url, err := api.AuthorizedURL("http://127.0.0.1")
-	require.NoError(t, err)
+	require.NoError(t, err, "error = %v", err)
 	require.NotEqual(t, "", token)
 	require.NotEqual(t, "", url)
 }

@@ -16,7 +16,5 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	cobra.OnInitialize(config.InitConfig)
-
 	config.InitFlagSet(rootCmd.Use, rootCmd.Flags())
 }
