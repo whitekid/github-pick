@@ -13,6 +13,6 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.1
 	github.com/stretchr/testify v1.6.1
-	github.com/swaggo/swag v1.6.9
+	github.com/swaggo/swag v1.7.0
 	github.com/whitekid/go-utils v0.0.0-20201127140658-51e8514b0035
 )

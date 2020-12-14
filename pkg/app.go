@@ -184,11 +184,12 @@ func (s *pocketService) handleGetIndex(c echo.Context) error {
 	log.Debugf("article: %+v", article)
 
 	url := fmt.Sprintf("https://app.getpocket.com/read/%s", article.ItemID)
-	if article.IsArticle == "1" {
-		url = article.ResolvedURL
-	}
+	// IsArticle이 뭔 의미인지..
+	// if article.IsArticle == "1" {
+	// 	url = article.ResolvedURL
+	// }
 
-	log.Infof("move to %s, resolved: %s", url, article.ResolvedURL)
+	// log.Infof("move to %s, resolved: %s", url, article.ResolvedURL)
 	return c.Redirect(http.StatusFound, url)
 }
 

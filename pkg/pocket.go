@@ -43,12 +43,39 @@ func NewGetPocketAPI(consumerKey, accessToken string) *GetPocketAPI {
 	return api
 }
 
-// Article pocket article, simplified version, it's not full structure
+// Article pocket article, see https://getpocket.com/developer/docs/v3/retrieve
 type Article struct {
-	ItemID      string `json:"item_id"`
-	GivenURL    string `json:"given_url"`
-	ResolvedURL string `json:"resolved_url"`
-	IsArticle   string `json:"is_article"`
+	ItemID        string `json:"item_id"`
+	ResolvedID    string `json:"resolved_id"`
+	GivenURL      string `json:"given_url"`
+	GivelTitle    string `json:"given_title"`
+	Favorite      string `json:"favorite"`
+	Status        string `json:"status"`
+	ResolvedTitle string `json:"resolved_title"`
+	ResolvedURL   string `json:"resolved_url"`
+	Excerpt       string `json:"excerpt"`
+	IsArticle     string `json:"is_article"`
+	HasVideo      string `json:"has_video"`
+	HasImage      string `json:"has_image"`
+	WordCount     string `json:"word_count"`
+	Images        map[string]struct {
+		ItemID  string `json:"item_id"`
+		ImageID string `json:"image_id"`
+		Src     string `json:"src"`
+		Width   string `json:"width"`
+		Height  string `json:"height"`
+		Credit  string `json:"credit"`
+		Caption string `json:"caption"`
+	} `json:"images"`
+	Videos map[string]struct {
+		ItemID  string `json:"item_id"`
+		VideoID string `json:"video_id"`
+		Src     string `json:"src"`
+		Width   string `json:"width"`
+		Height  string `json:"height"`
+		Type    string `json:"type"`
+		Vid     string `json:"vid"`
+	} `json:"videos"`
 }
 
 func (g *GetPocketAPI) success(r *request.Response) error {
