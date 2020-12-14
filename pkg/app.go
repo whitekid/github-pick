@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/allegro/bigcache"
@@ -184,6 +185,18 @@ func (s *pocketService) handleGetIndex(c echo.Context) error {
 	log.Debugf("article: %+v", article)
 
 	url := fmt.Sprintf("https://app.getpocket.com/read/%s", article.ItemID)
+	for _, u := range []string{"blog.naver.com"} {
+		if strings.Contains(url, u) {
+			url = article.ResolvedID
+			break
+		}
+	}
+	// get pocket의 article view로 보이지 않는 것들..
+	// https://brunch.co.kr/@workplays/29
+	// http://m.blog.naver.com/mentoru/220042812351
+	//
+	// x 안보이는 것은... item_id, resolved_id가 같다?
+	//
 	// IsArticle이 뭔 의미인지..
 	// if article.IsArticle == "1" {
 	// 	url = article.ResolvedURL
