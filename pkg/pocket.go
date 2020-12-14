@@ -46,7 +46,7 @@ func NewGetPocketAPI(consumerKey, accessToken string) *GetPocketAPI {
 // Article pocket article, simplified version, it's not full structure
 type Article struct {
 	ItemID      string `json:"item_id"`
-	GivelURL    string `json:"given_url"`
+	GivenURL    string `json:"given_url"`
 	ResolvedURL string `json:"resolved_url"`
 	IsArticle   string `json:"is_article"`
 }
