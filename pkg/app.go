@@ -146,7 +146,7 @@ func (s *pocketService) handleGetIndex(c echo.Context) error {
 			return errors.Wrapf(err, "get cache failed: %s", key)
 		}
 
-		articleList, err = api.Articles.Get(GetOpts{Favorite: Favorited})
+		articleList, err = api.Articles.Get(WithFavorate(Favorited))
 		if err != nil {
 			return errors.Wrap(err, "get favorite artcles failed")
 		}
@@ -174,7 +174,7 @@ func (s *pocketService) handleGetIndex(c echo.Context) error {
 	selected := ""
 	i := 0
 	for k := range articleList {
-		if i == pick-1 {
+		if i == pick {
 			selected = k
 			break
 		}

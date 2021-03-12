@@ -35,9 +35,7 @@ func TestArticleSearch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			api := NewGetPocketAPI(config.ConsumerKey(), config.AccessToken())
-			items, err := api.Articles.Get(GetOpts{
-				Search: tt.args.url,
-			})
+			items, err := api.Articles.Get(WithSearch(tt.args.url))
 			require.NoError(t, err)
 			require.Equal(t, 1, len(items))
 

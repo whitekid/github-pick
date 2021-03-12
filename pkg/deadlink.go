@@ -12,7 +12,7 @@ import (
 // CheckDeadLink ...
 func CheckDeadLink() error {
 	api := NewGetPocketAPI(config.ConsumerKey(), config.AccessToken())
-	items, err := api.Articles.Get(GetOpts{Favorite: Favorited})
+	items, err := api.Articles.Get(WithFavorate(Favorited))
 	if err != nil {
 		return errors.Wrap(err, "articles.Get(Favorite)")
 	}

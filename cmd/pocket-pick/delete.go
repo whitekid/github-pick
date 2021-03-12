@@ -29,9 +29,7 @@ func deleteArticle(itemIDs ...string) error {
 	for _, arg := range itemIDs {
 		// delete by url
 		if strings.HasPrefix(arg, "http://") || strings.HasPrefix(arg, "https://") {
-			items, err := api.Articles.Get(pocket.GetOpts{
-				Search: arg,
-			})
+			items, err := api.Articles.Get(pocket.WithSearch(arg))
 			if err != nil {
 				return errors.Wrapf(err, "articles.Get(%+v)", arg)
 			}

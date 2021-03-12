@@ -91,12 +91,10 @@ func (g *GetPocketAPI) success(r *request.Response) error {
 func (g *GetPocketAPI) AuthorizedURL(redirectURI string) (string, string, error) {
 	resp, err := request.Post("https://getpocket.com/v3/oauth/request").
 		Header("X-"+echo.HeaderAccept, echo.MIMEApplicationJSON).
-		JSON(
-			map[string]string{
-				"consumer_key": g.consumerKey,
-				"redirect_uri": redirectURI,
-			},
-		).Do()
+		JSON(map[string]string{
+			"consumer_key": g.consumerKey,
+			"redirect_uri": redirectURI,
+		}).Do()
 
 	if err != nil {
 		return "", "", err
@@ -156,13 +154,6 @@ const (
 	Favorited   = 2 // only return favorited items
 )
 
-// GetOpts ...
-type GetOpts struct {
-	Search   string // Only return items whose title or url contain the search string
-	Domain   string // Only return items from a particular domain
-	Favorite int    // only return favorited items
-}
-
 // ArticleGetResponse ...
 type ArticleGetResponse struct {
 	Status int                 `json:"status"`
@@ -170,7 +161,7 @@ type ArticleGetResponse struct {
 }
 
 // Get Retrieving a User's Pocket Data
-func (a *ArticlesAPI) Get(opts GetOpts) (map[string]Article, error) {
+func (a *ArticlesAPI) Get(opts ...GetOption) (map[string]Article, error) {
 	params := map[string]interface{}{
 		"consumer_key": a.pocket.consumerKey,
 		"access_token": a.pocket.accessToken,
@@ -178,16 +169,21 @@ func (a *ArticlesAPI) Get(opts GetOpts) (map[string]Article, error) {
 		"detailType":   "simple",
 	}
 
-	if opts.Favorite != 0 {
-		params["favorite"] = strconv.FormatInt(int64(opts.Favorite-1), 10)
+	var getOptions GetOptions
+	for _, o := range opts {
+		o.apply(&getOptions)
 	}
 
-	if opts.Search != "" {
-		params["search"] = opts.Search
+	if getOptions.favorite != 0 {
+		params["favorite"] = strconv.FormatInt(int64(getOptions.favorite-1), 10)
 	}
 
-	if opts.Domain != "" {
-		params["domain"] = opts.Domain
+	if getOptions.search != "" {
+		params["search"] = getOptions.search
+	}
+
+	if getOptions.domain != "" {
+		params["domain"] = getOptions.domain
 	}
 
 	resp, err := a.pocket.sess.Post("https://getpocket.com/v3/get").
