@@ -84,7 +84,7 @@ func (g *GetPocketAPI) success(r *request.Response) error {
 	}
 	message := r.Header.Get("x-error")
 	code := r.Header.Get("x-error-code")
-	return fmt.Errorf("Error with status: %d, error=%s, code=%s", r.StatusCode, message, code)
+	return fmt.Errorf("error with status: %d, error=%s, code=%s", r.StatusCode, message, code)
 }
 
 // AuthorizedURL get authorizedURL
@@ -132,7 +132,7 @@ func (g *GetPocketAPI) NewAccessToken(requestToken string) (string, string, erro
 	}
 
 	if err := g.success(resp); err != nil {
-		return "", "", fmt.Errorf("Failed with status: %d", resp.StatusCode)
+		return "", "", fmt.Errorf("failed with status: %d", resp.StatusCode)
 	}
 
 	var response struct {
