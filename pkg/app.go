@@ -9,9 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/allegro/bigcache"
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
@@ -35,20 +33,15 @@ func New() service.Interface {
 		panic("ROOT_URL required")
 	}
 
-	config := bigcache.DefaultConfig(config.CacheEvictionTimeout())
-	config.CleanWindow = time.Minute
-
-	cache, _ := bigcache.NewBigCache(config)
-
 	return &pocketService{
-		cache:   cache,
+		cache:   newBigCache(),
 		rootURL: rootURL,
 	}
 }
 
 type pocketService struct {
 	rootURL string
-	cache   *bigcache.BigCache // for api cache
+	cache   cacher // for api cache
 }
 
 // Serve serve the main service
@@ -139,13 +132,10 @@ func (s *pocketService) handleGetIndex(c echo.Context) error {
 	key := fmt.Sprintf("%s/favorites", accessToken)
 	api := NewGetPocketAPI(config.ConsumerKey(), accessToken)
 
-	data, err := s.cache.Get(key)
+	data, exists := s.cache.Get([]byte(key))
 	var articleList map[string]Article
-	if err != nil {
-		if err != bigcache.ErrEntryNotFound {
-			return errors.Wrapf(err, "get cache failed: %s", key)
-		}
-
+	if !exists {
+		var err error
 		articleList, err = api.Articles.Get(WithFavorate(Favorited))
 		if err != nil {
 			return errors.Wrap(err, "get favorite artcles failed")
@@ -157,7 +147,7 @@ func (s *pocketService) handleGetIndex(c echo.Context) error {
 		if err != nil {
 			return errors.Wrap(err, "json encode failed")
 		}
-		s.cache.Set(key, buf)
+		s.cache.Set([]byte(key), buf, withTTL(config.CacheEvictionTimeout()))
 	} else {
 		log.Debug("load articles from cache")
 

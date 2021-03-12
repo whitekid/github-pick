@@ -5,6 +5,8 @@ go 1.16
 require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
 	github.com/allegro/bigcache v1.2.1
+	github.com/allegro/bigcache/v2 v2.2.5 // indirect
+	github.com/allegro/bigcache/v3 v3.0.0
 	github.com/gorilla/sessions v1.2.1
 	github.com/labstack/echo-contrib v0.9.0
 	github.com/labstack/echo/v4 v4.2.1
